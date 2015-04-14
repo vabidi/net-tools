@@ -1,4 +1,4 @@
 # net-tools
 Useful utilities
 
-Python utilities foor network engineers
+Python utilities for network engineers
