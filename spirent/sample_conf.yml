@@ -1,0 +1,119 @@
+constants:
+  license_server: 10.152.98.50
+  lab_server: 10.98.80.242
+  duration: 120
+  iterations: 1
+
+
+stcv_vms:
+ - stc1:
+      mgmt_ip: 174.129.180.153
+      data_ip: 192.168.50.17
+      gw_ip:   192.168.50.1
+ 
+ - stc2:
+      mgmt_ip: 52.0.182.40
+      data_ip: 192.168.50.33
+      gw_ip:   192.168.50.1
+
+ - stc3:
+      mgmt_ip: 18.206.116.214
+      data_ip: 192.168.50.34
+      gw_ip:   192.168.50.1
+
+ - stc4:
+      mgmt_ip: 3.91.121.205
+      data_ip: 192.168.50.67
+      gw_ip:   192.168.50.1
+
+ - stc11:
+      mgmt_ip: 18.204.234.28
+      data_ip: 192.168.50.36
+      gw_ip:   192.168.50.1
+
+ - stc12:
+      mgmt_ip: 52.2.99.106
+      data_ip: 192.168.50.71
+      gw_ip:   192.168.50.1
+
+ - stc13:
+      mgmt_ip: 100.24.76.204
+      data_ip: 192.168.50.72
+      gw_ip:   192.168.50.1
+
+ - stc14:
+      mgmt_ip: 3.95.88.134
+      data_ip: 192.168.50.10
+      gw_ip:   192.168.50.1
+
+ - stc21:
+      mgmt_ip: 52.203.138.62
+      data_ip: 192.168.50.65
+      gw_ip:   192.168.50.1
+ 
+ - stc22:
+      mgmt_ip: 3.226.6.126
+      data_ip: 192.168.50.66
+      gw_ip:   192.168.50.1
+ 
+ - stc23:
+      mgmt_ip: 35.169.5.146
+      data_ip: 192.168.50.19
+      gw_ip:   192.168.50.1
+
+ - stc24:
+      mgmt_ip: 34.204.227.50
+      data_ip: 192.168.50.68
+      gw_ip:   192.168.50.1
+
+ - stc25:
+      mgmt_ip: 3.217.170.178
+      data_ip: 192.168.50.18
+      gw_ip:   192.168.50.1
+
+ - stc26:
+      mgmt_ip: 18.235.48.110
+      data_ip: 192.168.50.35
+      gw_ip:   192.168.50.1
+
+ - stc27:
+      mgmt_ip: 52.206.92.97
+      data_ip: 192.168.50.69
+      gw_ip:   192.168.50.1
+
+ - stc28:
+      mgmt_ip: 3.224.63.177
+      data_ip: 192.168.50.70
+      gw_ip:   192.168.50.1
+
+test_list:
+  - TNS4_1:
+      streams: 
+        - sb1: 
+            tx_vm: 'stc21'
+            rx_vms: ['stc1']
+        - sb2: 
+            tx_vm: 'stc22'
+            rx_vms: ['stc2']
+        - sb3: 
+            tx_vm: 'stc23'
+            rx_vms: ['stc3']
+        - sb4: 
+            tx_vm: 'stc24'
+            rx_vms: ['stc4']
+        - sb5: 
+            tx_vm: 'stc25'
+            rx_vms: ['stc11']
+        - sb6: 
+            tx_vm: 'stc26'
+            rx_vms: ['stc12']
+        - sb7: 
+            tx_vm: 'stc27'
+            rx_vms: ['stc13']
+        - sb8: 
+            tx_vm: 'stc28'
+            rx_vms: ['stc14']
+      frame_length: [64]
+      load_kpps: [8000]
+      num_flows: [256]
+
