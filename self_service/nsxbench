@@ -1,0 +1,440 @@
+#!/usr/bin/python
+
+"""
+ Usage:
+     1. Deploy, Run, and Compare
+        Deploy Logical Topologies with build#1, run tests.
+        Deploy Logical Topologies with build#2, run tests.
+        Save results for all runs.
+             #nsxbench input.yml
+
+     2. Deploy Only. Deploy a Logical Topology
+           Example 1:
+             #nsxbench --deploy input.yml
+             deploy topology specified in input.yml, with existing build.
+           Example 2:
+             #nsxbench --deploy --fresh input.yml
+             nuke mgr, ctrlr of old build. Then deploy afresh.
+
+     3. Run Only.
+             #nsxbench --run --tag <tag-string> input.yml
+         'tag'  is used to identify the tests results.
+         'tag' can be any arbitrary value. you may want to use the build-number.
+
+     4. Show report for given tags.
+          Example 1:
+            #nsxbench --show_report --tag <tag1>  input.yml
+          Example 2:
+            #nsxbench --show_report --tag <tag1>  --verbose input.yml
+          Example 3:
+            #nsxbench --show_report --tag <tag1>  --tag <tag2> input.yml
+            Shows reports for both tags, and also percent comparison
+
+     5. Deploy and Run. 
+         Accepts all parameters from json string.
+         This mode is useful for supporting a remote executor.
+          Example 1:
+            #nsxbench --json '<dict>' nofile
+            Note: don't use quotes inside the dict.
+"""
+
+import sys
+import argparse
+import subprocess
+import os
+from contextlib import contextmanager
+import yaml
+import json
+import re
+
+SUPPORTED_TESTS = {"tcp_stream_vm1_m16k", "tcp_stream_vm1_m64",
+        "tcp_stream_vm8_m16k", "tcp_stream_vm8_m64",
+        "udp_stream_vm1_m64", "udp_stream_vm1_m1024",
+        "udp_stream_vm8_m64", "udp_stream_vm8_m1024",
+        "tcp_crr_vm1_s64", "tcp_crr_vm8_s64"}
+
+SUPPORTED_TOPOLOGIES = {"LS.vlan", "LS.overlay", "LS-T1.overlay", "T1-T0.overlay"}
+
+TESTSUITES = ["tcp_stream", "udp_stream", "tcp_crr"]
+
+SYSTESTDIR = "/root/nsx-qe/systest"
+PKTGENDIR = "/root/nsx-qe/pktgenperf"
+
+def runcmd(cmd):
+    """
+     Run a CLI command
+     Return: the CLI output
+    """
+    try:
+        ob = subprocess.check_output(cmd.split())
+    except subprocess.CalledProcessError as e:
+        print("Error while running cmd (%s): %s" % (cmd, str(e.returncode)))
+        return None
+    return ob
+
+
+@contextmanager
+def cd(newdir):
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
+
+
+def args_get():
+    """ Retrieve scripts args """
+    parser = argparse.ArgumentParser(
+            description=__doc__,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+    
+    parser.add_argument("config_file", help="Input yaml file")
+    parser.add_argument("--deploy", help="Deploy only", action="store_true")
+    parser.add_argument("--buildnum", help="Buildnum to deploy")
+    parser.add_argument("--fresh", help="nuke previous build", action="store_true")
+    parser.add_argument("--topology", help="Logical topology name")
+    parser.add_argument("--run", help="Run only", action="store_true")
+    parser.add_argument("--verbose", help="Verbose output", action="store_true")
+    parser.add_argument("--tag", help="Unique identifier", action="append")
+    parser.add_argument("--show_report", help="Show report", action="store_true")
+    parser.add_argument("-y", help="force yes", dest='force_yes', action="store_true")
+    parser.add_argument("--json", help="json string")
+    args = parser.parse_args()
+    return args
+
+            
+def read_configs(infile):
+    """ Read the yaml file """
+    cfg = {}
+    with open(infile) as hdl:
+        cfg = yaml.safe_load(hdl)
+    return cfg
+
+def do_physical_setup():
+    raise ValueError('Not implemented')
+    return
+
+def _template_render(templfile, fvals):
+    with open(templfile, "r") as hdl:                                          
+        template = hdl.readlines()                                              
+    template = [item % fvals for item in template]
+    return template
+
+def do_render(tmplfile, outfile, fvals):
+    with open(outfile, "w") as hdl:                                         
+        for item in _template_render(tmplfile, fvals):                                      
+            hdl.write(item)  
+    return
+
+def make_config_file(build, tag, ltopo, test):
+    """" Generate config file from the template """
+    tmplfile = "nsxp.tmpl"
+    outfile = "conf.yml"
+    fvals = {'build': build, 'tag': tag, 'test': test, 'topology': ltopo}
+    do_render(tmplfile, outfile, fvals)
+    return outfile
+
+def get_test_dir(test):
+    if test.startswith("tcp_stream"):
+        tdir = "tcp_stream"
+    elif test.startswith("tcp_crr"):
+        tdir = "test_tcp_crr"
+    elif test.startswith("udp_stream"):
+        tdir =  "udp_stream"
+    else:
+        tdir = None
+    return tdir
+
+
+def reset_hosts():
+    """ Prepare ESX hosts before loading NSX build """
+    with cd(PKTGENDIR):
+        cmd = "./systest_robust_setup_host.sh"
+        runcmd(cmd)
+
+def perf_clean(bldnum, donuke="clean"):
+    """ Cleanup or nuke the old topology """
+    cmd = "./nsxp_clean.sh -b %s -p %s" % (bldnum, donuke)
+    runcmd(cmd)
+
+def perf_deploy(bldnum, topo):
+    """ Deploy a logical topology """
+    cmd = "./nsxp_deploy.sh -b %s -t %s" % (bldnum, topo)
+    runcmd(cmd)
+    with cd(PKTGENDIR):
+        cmd = "./get_test_vms.py"
+        runcmd(cmd)
+    return 0
+
+def perf_run(bldnum, tag, ltopo, tests, nreps):
+    """ Run performance tests """
+    for test in tests:
+        for runnum in range(1, nreps+1):
+            rtag = tag + ".%d" % runnum
+            ymlfile = make_config_file(bldnum, rtag, ltopo, test)
+            cmd = "./nsxp_run.sh -c %s" % ymlfile
+            runcmd(cmd)
+
+def perf_show_report(tags, verbose=False):
+    """ show summary report for one or two tags """
+    tag1results, tag2results = None, None
+    for index, tag in enumerate(tags):
+        if index > 1: # don't process more than 2 tags
+            break
+        resdlist = []
+        for testsuite in TESTSUITES:
+            tdir = get_test_dir(testsuite)
+            tdir = os.path.join("../testsuites", tdir)
+            with cd(tdir):
+                sys.path.insert(0, os.getcwd())
+                import nsxperf
+                resd = nsxperf.get_metrics(tag)
+                # Cleanup the import
+                sys.path.remove(os.getcwd())
+                del sys.modules['nsxperf']
+                if resd:
+                    resdlist.append(resd)
+        # Combine results into one dict
+        tagresults = {}
+        for resd in resdlist:
+            metavars = resd['metavars']
+            if 'metavars' not in tagresults:
+                tagresults['metavars'] = metavars
+                tagresults['results'] = {}
+            results = resd['results']
+            for tpl in results:
+                if tpl not in tagresults['results']:
+                    tagresults['results'][tpl] = {}
+                for test in results[tpl]:
+                    tagresults['results'][tpl][test] = results[tpl][test]
+        if index == 0:
+            tag1results = tagresults
+        else:
+            tag2results = tagresults
+
+    perf_dump_output(tag1results, tag2results, details=verbose)
+
+def remove_prefix(text, prefix):
+    """ Remove a prefix from a string """
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text
+
+def safe_div(x, y):
+    """ Return 0 if divisor is 0 """
+    return x/y if y else 0
+
+def perf_dump_output(tag1results, tag2results, details=False):
+    """ Print out results """
+    rows = []
+    tag1 = tag1results['metavars']['tag']
+    tag2 = tag2results['metavars']['tag'] if tag2results else None
+
+    dic1 = tag1results['results']
+    if tag2:
+        dic2 = tag2results['results']
+
+    for tpl in dic1:
+        da = dic1[tpl]
+        for test in da:
+            db = da[test]['average']
+            dc = da[test]['list']
+            for metric in db:
+                val = db[metric]
+                row = [test, metric, tpl, val]
+                if details:
+                    row.append(dc[metric])
+                if tag2:
+                    if tpl in dic2 and test in dic2[tpl]:
+                        val2 = dic2[tpl][test]['average'][metric]
+                        diff = safe_div((val-val2)*100.0, val2)
+                    else:
+                        val2 = 0
+                        diff = 0.0                        
+                    row.append(val2)
+                    row.append(diff)
+                rows.append(row)
+    if tag2:
+        header = "%20s  %10s  %14s   tag-%-10s tag-%-10s Diff%%" % \
+                ("Test", "Metric", "topology", tag1, tag2)
+        row_fmt = "%20s  %10s  %14s   %-12d %-12d %+.2f"
+    elif not details:
+        header = "%20s  %10s  %14s   tag-%-10s" % \
+                ("Test", "Metric", "topology", tag1)
+        row_fmt = "%-20s  %10s  %14s   %-12d"
+    else:
+        header = "%20s  %10s  %14s   tag-%-10s Multiple Runs" % \
+                ("Test", "Metric", "topology", tag1)
+        row_fmt = "%-20s  %10s  %14s   %-12d %s"
+
+
+    print "\n%s" % header
+    print "-" * 80
+    for row in rows:
+        row[0] = remove_prefix(row[0], "test_")
+        if details:
+            # The last item is a list of ints. 
+            # Convert it to a printable string
+            mlist = row[-1]
+            row[-1] = ' '.join(str(i) for i in mlist)
+        row_str = row_fmt % tuple(row)
+        print row_str
+       
+
+def do_perf_main(argt, user_configs):
+    """ Entry point """
+    builds = user_configs['perfdeploy']['nsx_build']                        
+    topos = user_configs['perfdeploy']['logical_topology']
+    tests = user_configs['perfrun']['testname']
+    niter = int(user_configs['perfrun']['iterations'])
+    test0 = tests[0]
+    bld0 = builds[0]
+    ltop0 = topos[0]
+    if argt.run:
+        tag = (argt.tag)[0]
+        perf_run(bld0, tag, ltop0, tests, niter)
+    elif argt.show_report:
+        perf_show_report(argt.tag, argt.verbose)
+    elif argt.deploy:
+        print "Takes several minutes. To examine logs, do 'tail -f systest.log'" 
+        if argt.fresh:
+            perf_clean(bld0, donuke="nuke")
+            reset_hosts()
+        else:
+            perf_clean(bld0)
+        perf_deploy(bld0, ltop0)
+    else:
+        # Based on settings in the input yaml file,
+        # For each build, for each topology, for each test,
+        # run 'n' iterations of specified tests
+        #print "Takes several minutes. To examine logs, do 'tail -f systest.log'"
+        #print "Completed Tests with build %s" % builds[0]
+        #import time; time.sleep(5)
+        #return
+        #import pdb; pdb.set_trace()
+        for bld in builds:
+            #perf_clean(bld0, donuke="nuke")
+            #reset_hosts()
+            numtopos = len(topos)
+            for idx, ltop in enumerate(topos):
+                rc = perf_deploy(bld, ltop)
+                if rc != 0: 
+                    print "Deploy Failed build %s topology %s" % (bld, ltop)
+                    sys.exit()
+                tag = str(bld)
+                perf_run(bld, tag, ltop, tests, niter)
+                if idx < numtopos-1: # get ready to deploy next topology
+                    perf_clean(bld) 
+
+
+def get_yes_or_no(prompt):
+    """ Get yes/no from user """
+    yes = {'yes', 'y'}
+    no = {'no','n'}
+    while True:
+        print prompt
+        choice = raw_input().lower()
+        if choice in yes:
+            return True
+        elif choice in no:
+            return False
+        else:
+            print "Please respond with 'yes' or 'no'"
+
+def verify(argt, user_configs):
+    """ Get verification from user """
+    tests = user_configs['perfrun']['testname']
+    topos = user_configs['perfdeploy']['logical_topology']
+    nreps = int(user_configs['perfrun']['iterations'])
+    builds = user_configs['perfdeploy']['nsx_build']
+
+    for test in tests:
+        if test not in SUPPORTED_TESTS:
+            print "ERROR: test %s is not implemented" % test
+            return False
+    for topo in topos:
+        if topo not in SUPPORTED_TOPOLOGIES:
+            print "ERROR: topology %s is not implemented" % topo
+            return False
+
+    if argt.run:
+        if not argt.tag:
+            print "ERROR: For --run, you must specify --tag"
+            return False
+        tag = (argt.tag)[0]
+        sts = " - Run the following tests %s times, and tag result with '%s'\n" % (nreps, tag)
+        for test in tests: sts = sts + "  " + test + "\t"
+    elif argt.show_report:
+        if not argt.tag:
+            print "ERROR: For --show_report, you must specify --tag"
+            return False
+        elif len(argt.tag) > 2:
+            print "ERROR: Too many tags"            
+            return False
+        elif len(argt.tag) > 1 and argt.verbose:
+            print "ERROR: Use only one tag with --verbose"
+            return False
+        tags = argt.tag
+        if len(tags) == 1:
+            sts = " - Show results summary for tag '%s'" % tuple(tags)
+        else:
+            sts = " - Show results summary for tags '%s' and '%s'" % tuple(tags)
+    elif argt.deploy:
+        bld = builds[0]
+        topo = topos[0]
+        if topo not in SUPPORTED_TOPOLOGIES:
+            print "ERROR: topology %s is not implemented" % topo
+            return False
+        sts = " - Deploy topology %s with NSX Build# %s" % (topo, bld)
+        if argt.fresh:
+            sts = sts + " (nuke old build)"
+    else:
+        sts = "For each build, deploy each topology, and then run \n"
+        sts = sts + " each test %s times\n" % nreps
+        sts = sts + "Builds: "
+        for bld in builds: sts = sts + str(bld) + "\t"
+        sts = sts + "\nTopologies: "
+        for topo in topos: sts = sts + topo + "\t"
+        sts = sts + "\nTests: "
+        for test in tests: sts = sts + test + "\t"
+    print "\n These tasks will be executed -   \n\t" + sts + "\n"
+
+    return get_yes_or_no("Proceed with tasks? (y/n): ")  
+
+def _add_quotes(jss):
+    """ add quotes around words """
+    qstr = re.sub(r'([\w_.]+)', r'"\1"', jss)
+    return qstr
+
+def read_perfargs(jss):
+    """ return a user_configs type of dict """
+    pcfg = {'perfdeploy': {'logical_topology': [], 'nsx_build': []}, 
+            'perfrun': {'testname': [], 'iterations': 1}, 
+            'perfinfo': {'username': '', 'testbed': ''}}
+    # When this program is called remotely, quotes are stripped.
+    # restore quotes around keys and values
+    qjss = _add_quotes(jss)
+    jdic = json.loads(qjss)
+    # Does input dict need validation or transformation? do it here.
+    pcfg = jdic
+    return pcfg
+
+
+def main():
+    """ Read in arguments, and invoke the top-level runner function """
+    argt = args_get()
+    if argt.config_file == "nofile":
+        # read all arguments from the command line json string
+        user_configs = read_perfargs(argt.json)
+    else:
+        user_configs = read_configs(argt.config_file)
+        if len(user_configs) == 0:
+            raise ValueError("ERROR: could not parse %s" % argt.config_file)
+        if not argt.force_yes and not verify(argt, user_configs):
+            sys.exit()
+        print
+    do_perf_main(argt, user_configs)
+
+if __name__=="__main__":
+    main()

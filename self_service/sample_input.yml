@@ -1,0 +1,35 @@
+perfdeploy:
+  logical_topology: 
+    - topology1
+    - topology2
+    - topology3
+  nsx_build: 
+    - build1
+    - build2
+
+perfrun:    
+  testname:
+    - testname1 # for example, tcp_crr_vm1_s64
+    - testname2 # for example, udp_stream_vm8_m64
+
+  iterations: number_of_reps # for example, 3
+
+######################################################################
+##### The lines below describe the testbed. DO NOT MODIFY THEM #######
+
+perfsetup:
+  username: 
+  type: esx
+  
+  servers:
+    0: 
+      name: prmh-nsx-perf-server146
+      uplink: vmnic5
+    1: 
+      name: prmh-nsx-perf-server147
+      uplink: vmnic5
+
+  appliance_host: 10.172.4.9
+
+  
+
