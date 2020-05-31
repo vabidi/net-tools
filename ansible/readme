@@ -1,0 +1,10 @@
+
+Some example commands
+
+#set MTU=8900
+ansible vmcvms -i ../ansib/tcphosts -a "ifconfig eth0 mtu 8900" -m shell
+
+# start iperf server on VMs, in background
+ansible vmcvms -B 6000 -P 0 -i tcphosts -a "iperf3 -s"
+
+

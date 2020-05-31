@@ -1,0 +1,45 @@
+[vmcvms]
+u1 ansible_host=3.233.195.168
+u2 ansible_host=18.235.17.77
+u3 ansible_host=3.217.162.71
+u4 ansible_host=3.229.160.159
+u11 ansible_host=54.87.224.101
+u12 ansible_host=3.214.47.187
+u13 ansible_host=35.170.247.123
+u14 ansible_host=54.165.226.56
+u21 ansible_host=34.199.44.177
+u22 ansible_host=54.210.86.204
+u23 ansible_host=35.153.90.13
+u24 ansible_host=107.23.41.84
+u25 ansible_host=52.71.3.145
+u26 ansible_host=34.197.186.54
+u27 ansible_host=3.214.207.71
+u28 ansible_host=52.54.76.99
+
+
+[vmcvms:vars]
+ansible_user=root
+ansible_ssh_pass=ca$hc0w
+
+[perfservers]
+u1      
+u2   
+u3   
+u4   
+
+[perfclients]
+vm100 dest=vm2 destip={{hostvars[dest].ansible_host}}      
+vm200 dest=vm4 destip={{hostvars[dest].ansible_host}}      
+
+
+[perfclients:vars]
+bw=2
+pthreads=6
+duration=60
+size=100
+
+
+[loopers]
+vm1
+vm2
+

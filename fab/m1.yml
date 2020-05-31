@@ -1,0 +1,57 @@
+constants:
+  duration: 60
+
+
+vms:
+ - n1:
+      mgmt_ip: 172.31.1.187
+      data_ip: 172.31.1.187
+ - n2:
+      mgmt_ip: 172.31.1.180
+      data_ip: 172.31.1.180
+ - n3:
+      mgmt_ip: 172.31.1.253
+      data_ip: 172.31.1.253
+ - n4:
+      mgmt_ip: 172.31.1.204
+      data_ip: 172.31.1.204
+ - u1:
+      mgmt_ip: 192.168.20.2
+      data_ip: 192.168.20.2
+ 
+ - u2:
+      mgmt_ip: 192.168.20.3
+      data_ip: 192.168.20.3
+ - u3:
+      mgmt_ip: 192.168.20.37
+      data_ip: 192.168.20.37
+ - u4:
+      mgmt_ip: 192.168.20.73
+      data_ip: 192.168.20.73
+
+ - u21:
+      mgmt_ip: 192.168.20.5
+      data_ip: 192.168.20.5
+ 
+ - u22:
+      mgmt_ip: 192.168.20.9
+      data_ip: 192.168.20.9
+ - u23:
+      mgmt_ip: 192.168.20.74
+      data_ip: 192.168.20.74
+ - u24:
+      mgmt_ip: 192.168.20.38
+      data_ip: 192.168.20.38
+ - ubig1:
+      mgmt_ip: 192.168.20.75
+      data_ip: 192.168.20.75
+ - ubig2:
+      mgmt_ip: 192.168.20.76
+      data_ip: 192.168.20.76
+        
+test_info:
+      streams: 
+        - sb1:
+            tx_vm: 'ubig1'
+            rx_vms: ['ubig2']
+
