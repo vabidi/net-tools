@@ -14,9 +14,7 @@ from fabric.context_managers import env
 from fabric.api import execute, quiet
 import pdb
 
-# iperf server port
-BASEPORT = 5201
-
+DURATION_DFLT = 60
 
 def fabric_env(env):
     env.user = 'root'
@@ -25,22 +23,27 @@ def fabric_env(env):
     return env
 
 def get_vm_ip(vm_info, name):
+    ''' VM may have a single port, or two ports - a mgmt port and a data port'''
     mgmt_ip, data_ip = None, None
     for vmm in vm_info:
 	for k, val in vmm.items():
 		if k == name:
-			mgmt_ip = val['mgmt_ip']
-			data_ip = val['data_ip']
+			if 'port_ip' in val:
+				mgmt_ip = val['port_ip']
+				data_ip = val['port_ip']
+			else:	
+				mgmt_ip = val['mgmt_ip']
+				data_ip = val['data_ip']
 			return (mgmt_ip, data_ip)	
     return (mgmt_ip, data_ip)
 
-def get_vm_dataip_list(vm_info, names):
-    """ Given list of names, return list of IPs """
-    data_ips = []
-    for name in names:
-        data_ip = get_vm_ip(vm_info, name)[1]
-        data_ips.append(data_ip)
-    return data_ips
+
+def get_stream_info(streams, sname):
+    for stm in streams:
+	for k, val in stm.items():
+		if k == sname:
+			return val
+    return None
 
 
 def parse_mbps(bwstr, unitstr):
@@ -62,7 +65,6 @@ def iparse_tcp_res(result):
         liter = iter(lines)
         for line in liter:
        	    if "sender" in line:
-                #pdb.set_trace()
                 line = line.split()
                 if len(line) > 1:
                     if line[0] == '[SUM]':
@@ -82,14 +84,18 @@ def do_test_tcp(argt, configs):
     global env
     sips, dips = [], []
     vm_info = configs['vms']
-    streams = configs['test_info']['streams']
-    for stream in streams:
-        for sbname, val in stream.items():
-		tx_vm = val['tx_vm']
-		rx_vms = val['rx_vms']
-        	sips.append(get_vm_ip(vm_info, tx_vm)[0])
-        	dips.append(get_vm_dataip_list(vm_info, rx_vms))
-        
+    streams = configs['streams']
+    active_streams = configs['test_info']['active_streams']
+
+    for sname in active_streams:
+        sbval = get_stream_info(streams, sname)
+	if not sbval:
+		raise ValueError("Unknown stream name %s" % sname)
+        tx_vm = sbval['tx_vm']
+        rx_vm = sbval['rx_vm']
+        sips.append(get_vm_ip(vm_info, tx_vm)[0])
+        dips.append(get_vm_ip(vm_info, rx_vm)[1])
+    
     env = fabric_env(env)
     env.hosts = sips
     for i, sip in enumerate(sips):
@@ -106,9 +112,8 @@ def test_tcp():
     subcmd = cmdf % env.host_data[env.host]
     destinations = env.host_data[env.host]['dest']
     multicmd = ""
-    for dest in destinations:
-        cmd = "iperf3 -c %s " % dest + subcmd
-        multicmd = multicmd + cmd + " &"
+    cmd = "iperf3 -c %s " % destinations + subcmd
+    multicmd = multicmd + cmd + " &"
     
     multicmd = multicmd + " wait" 
     out = run(multicmd)
@@ -125,7 +130,7 @@ def read_configs(infile):
 def args_get():
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", help="Input yaml file")
-    parser.add_argument("--duration", help="duration", type=int, default=30)
+    parser.add_argument("--duration", help="duration", type=int, default=DURATION_DFLT)
     parser.add_argument("--pthreads", help="parallel threads", type=int, default=1)
     argt = parser.parse_args()
     return argt
