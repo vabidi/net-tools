@@ -1,61 +1,32 @@
 
 
 test_info:
-      active_streams: ['sb1', 'sb2']
+      active_streams: [sb1]
 
 
 streams: 
   - sb1:
-      tx_vm: 'n1'
-      rx_vm: 'u1'
+      tx_vm: n1
+      rx_vm: u1
   - sb2:
-      tx_vm: 'n2'
-      rx_vm: 'u2'
-  - sb3:
-      tx_vm: 'n3'
-      rx_vm: 'u3'
-  - sb4:
-      tx_vm: 'n4'
-      rx_vm: 'u4'
-  - sb5:
-      tx_vm: 'u1'
-      rx_vm: 'n1'
-  - sb6:
-      tx_vm: 'u2'
-      rx_vm: 'n2'
-  - sb7:
-      tx_vm: 'u3'
-      rx_vm: 'n3'
-  - sb8:
-      tx_vm: 'u4'
-      rx_vm: 'n4'
-
+      tx_vm: n2
+      rx_vm: u2
 
 vms:
  - n1:
-      port_ip: 10.98.80.246
+      port_ip: 10.8.80.245
 
  - n2:
-      port_ip: 10.98.80.253
-
- - n3:
-      port_ip: 10.98.80.249
-
- - n4:
-      port_ip: 10.98.80.243
+      port_ip: 10.8.80.223
 
  - u1:
-      port_ip: 192.168.20.2
+      port_ip: 192.168.20.65
  
  - u2:
-      port_ip: 192.168.20.5
+      port_ip: 192.168.20.66
 
- - u3:
-      port_ip: 192.168.50.101
-
- - u4:
-      port_ip: 192.168.50.102
-       
 
 constants:
   duration: 60
+  username: my_username
+  password: my_password

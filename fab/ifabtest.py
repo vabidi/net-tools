@@ -1,24 +1,32 @@
 #!/usr/bin/python
 
+""""
+Run performance tests to measure TCP bandwidth.
+Output is printed to console.
+
+Usage example:
+
+ ./ifabtest.py <config_file> --duration 60 --pthreads 4
+
+Questions and bug reports: please email vabidi@vmware.com
+"""
+
 import sys
 import os
 import argparse
 import yaml
-import json
 import sys
-import logging
 # use fabric<2.0
 from fabric.decorators import task, parallel
 from fabric.operations import run
 from fabric.context_managers import env
 from fabric.api import execute, quiet
-import pdb
 
 DURATION_DFLT = 60
 
-def fabric_env(env):
-    env.user = 'root'
-    env.password = 'ca$hc0w'
+def fabric_env(env, configs):
+    env.user = configs['constants']['username']
+    env.password = configs['constants']['password']
     env.host_data = dict()
     return env
 
@@ -96,7 +104,7 @@ def do_test_tcp(argt, configs):
         sips.append(get_vm_ip(vm_info, tx_vm)[0])
         dips.append(get_vm_ip(vm_info, rx_vm)[1])
     
-    env = fabric_env(env)
+    env = fabric_env(env, configs)
     env.hosts = sips
     for i, sip in enumerate(sips):
         env.host_data[sip] = {'dest': dips[i], 'duration': argt.duration, 

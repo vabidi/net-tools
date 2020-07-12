@@ -1,0 +1,68 @@
+ifabtest.py helps you run TCP streams between multiple endpoints.
+
+ifabtest.py uses iperf3 to generate traffic. 
+It uses 'fabric' to execute shell commands remotely.  
+
+The machine where you run ifabtest.py is called 'runner'.
+The machines which run iperf3 are called 'targets'
+
+PREREQUISITES:
+
+1. Install python v2 on runner
+2. Install fabric on runner
+     pip install 'fabric<2.0'
+3. Install yaml on runner
+     apt install python-yaml
+
+USAGE:
+
+ $ ./ifabtest.py -h
+usage: ifabtest.py [-h] [--duration DURATION] [--pthreads PTHREADS]
+                   config_file
+
+positional arguments:
+  config_file          Input yaml file
+
+optional arguments:
+  -h, --help           show this help message and exit
+  --duration DURATION  duration
+  --pthreads PTHREADS  parallel threads
+
+
+ Create a yml file containing the configuration. You can copy and modify the example yml file.
+ Run 'iperf3 -s &' on the target servers.
+
+
+EXAMPLE OUTPUT:
+$ ./ifabtest.py conf1.yml --duration 30 --pthreads 4
+[10.98.80.245] Executing task 'test_tcp'
+[10.98.80.245] run: iperf3 -c 10.98.80.223  -P 4 -i 30 -t 30 & wait
+[10.98.80.245] out: Connecting to host 10.98.80.223, port 5201
+[10.98.80.245] out: [  5] local 10.98.80.245 port 49020 connected to 10.98.80.223 port 5201
+[10.98.80.245] out: [  7] local 10.98.80.245 port 49022 connected to 10.98.80.223 port 5201
+[10.98.80.245] out: [  9] local 10.98.80.245 port 49024 connected to 10.98.80.223 port 5201
+[10.98.80.245] out: [ 11] local 10.98.80.245 port 49026 connected to 10.98.80.223 port 5201
+[10.98.80.245] out: [ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[10.98.80.245] out: [  5]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0   1.93 MBytes       
+[10.98.80.245] out: [  7]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0   2.18 MBytes       
+[10.98.80.245] out: [  9]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0   1.50 MBytes       
+[10.98.80.245] out: [ 11]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0   2.02 MBytes       
+[10.98.80.245] out: [SUM]   0.00-30.00  sec  69.9 GBytes  20.0 Gbits/sec    0             
+[10.98.80.245] out: - - - - - - - - - - - - - - - - - - - - - - - - -
+[10.98.80.245] out: [ ID] Interval           Transfer     Bitrate         Retr
+[10.98.80.245] out: [  5]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0             sender
+[10.98.80.245] out: [  5]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec                  receiver
+[10.98.80.245] out: [  7]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0             sender
+[10.98.80.245] out: [  7]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec                  receiver
+[10.98.80.245] out: [  9]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0             sender
+[10.98.80.245] out: [  9]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec                  receiver
+[10.98.80.245] out: [ 11]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec    0             sender
+[10.98.80.245] out: [ 11]   0.00-30.00  sec  17.5 GBytes  5.00 Gbits/sec                  receiver
+[10.98.80.245] out: [SUM]   0.00-30.00  sec  69.9 GBytes  20.0 Gbits/sec    0             sender
+[10.98.80.245] out: [SUM]   0.00-30.00  sec  69.8 GBytes  20.0 Gbits/sec                  receiver
+[10.98.80.245] out: 
+[10.98.80.245] out: iperf Done.
+[10.98.80.245] out: 
+
+clients=1 threads=4 Total Mbps = 20000
+
