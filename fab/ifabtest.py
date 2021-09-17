@@ -15,14 +15,18 @@ import sys
 import os
 import argparse
 import yaml
+import json
 import sys
+import logging
 # use fabric<2.0
 from fabric.decorators import task, parallel
 from fabric.operations import run
 from fabric.context_managers import env
 from fabric.api import execute, quiet
+import pdb
 
 DURATION_DFLT = 60
+BASEPORT = 5201
 
 def fabric_env(env, configs):
     env.user = configs['constants']['username']
@@ -108,7 +112,7 @@ def do_test_tcp(argt, configs):
     env.hosts = sips
     for i, sip in enumerate(sips):
         env.host_data[sip] = {'dest': dips[i], 'duration': argt.duration, 
-                              'P': argt.pthreads}
+                              'P': argt.pthreads, 'procs': argt.procs}
     res = execute(test_tcp)
     ns, nt, mbps = iparse_tcp_res(res)
     print "clients=%d threads=%d Total Mbps = %d" % (ns, nt, mbps)
@@ -116,12 +120,15 @@ def do_test_tcp(argt, configs):
 
 @parallel
 def test_tcp():
-    cmdf = " -P %(P)s -i 30 -t %(duration)s"
+    nprocs = env.host_data[env.host]['procs']
+    cmdf = " -P %(P)s -i 30 -t %(duration)s "
     subcmd = cmdf % env.host_data[env.host]
     destinations = env.host_data[env.host]['dest']
     multicmd = ""
-    cmd = "iperf3 -c %s " % destinations + subcmd
-    multicmd = multicmd + cmd + " &"
+    for i in xrange(nprocs):
+	port = BASEPORT+i
+    	cmd = "iperf3 -c %s -p %d" % (destinations, port) + subcmd
+    	multicmd = multicmd + cmd + " &"
     
     multicmd = multicmd + " wait" 
     out = run(multicmd)
@@ -140,6 +147,7 @@ def args_get():
     parser.add_argument("config_file", help="Input yaml file")
     parser.add_argument("--duration", help="duration", type=int, default=DURATION_DFLT)
     parser.add_argument("--pthreads", help="parallel threads", type=int, default=1)
+    parser.add_argument("--procs", help="number of processes", type=int, default=1)
     argt = parser.parse_args()
     return argt
 
